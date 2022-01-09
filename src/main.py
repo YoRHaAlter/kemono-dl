@@ -20,9 +20,15 @@ from .arguments import get_args
 from .logger import logger
 from .version import __version__
 
+from time import strftime, localtime
+
 args = get_args()
 OS_NAME = platform.system()
 TIMEOUT = 300
+myProxies = {
+    'http': 'http://' + '127.0.0.1:1080',
+    'https': 'http://' + '127.0.0.1:1080'
+}
 
 class downloader:
 
@@ -69,7 +75,7 @@ class downloader:
                 return
         headers = {'accept': 'application/json'}
         creators_api_url = f'https://{site}.party/api/creators/'
-        all_creators = self.session.get(url=creators_api_url, headers=headers, timeout=TIMEOUT)
+        all_creators = self.session.get(url=creators_api_url, headers=headers, timeout=TIMEOUT, proxies=myProxies)
         if site == 'kemono':
             self.kemono_creators = all_creators.json()
         if site == 'coomer':
@@ -88,7 +94,7 @@ class downloader:
         logger.info('Gathering favorite users')
         headers = {'accept': 'application/json'}
         fav_art_api_url = f'https://{site}.party/api/favorites?type=artist'
-        response = self.session.get(url=fav_art_api_url, cookies=args['cookies'], headers=headers, timeout=TIMEOUT)
+        response = self.session.get(url=fav_art_api_url, cookies=args['cookies'], headers=headers, timeout=TIMEOUT, proxies=myProxies)
         if not response.ok:
             logger.warning(f'{response.status_code} {response.reason}: Could not get favorite artists: Make sure you get your cookie file while logged in')
             return
@@ -101,7 +107,7 @@ class downloader:
         logger.info('Gathering favorite posts')
         headers = {'accept': 'application/json'}
         fav_art_api_url = f'https://{site}.party/api/favorites?type=post'
-        response = self.session.get(url=fav_art_api_url, cookies=args['cookies'], headers=headers, timeout=TIMEOUT)
+        response = self.session.get(url=fav_art_api_url, cookies=args['cookies'], headers=headers, timeout=TIMEOUT, proxies=myProxies)
         if not response.ok:
             logger.warning(f'{response.status_code} {response.reason}Could not get favorite posts: Make sure you get your cookie file while logged in')
             return
@@ -153,7 +159,7 @@ class downloader:
                 api_url = f'https://{site}.party/api/{service}/user/{user_id}?o={chunk}'
                 logger.debug(f'User API URL: {api_url}')
 
-            response = self.session.get(url=api_url, headers=headers, timeout=TIMEOUT).json()
+            response = self.session.get(url=api_url, headers=headers, timeout=TIMEOUT, proxies=myProxies).json()
             if not response and chunk == 0 and not post_id:
                 logger.error(f"Skipping User: No api information: URL {api_url}")
                 return
@@ -282,7 +288,7 @@ class downloader:
                 return
             pfp_banner_url = f"https://{self.current_user['site']}.party/{_item}s/{self.current_user['service']}/{self.current_user['user_id']}"
             logger.debug(f"Profile {_item} URL {pfp_banner_url}")
-            response = self.session.get(url=pfp_banner_url, cookies=args['cookies'], timeout=TIMEOUT)
+            response = self.session.get(url=pfp_banner_url, cookies=args['cookies'], timeout=TIMEOUT, proxies=myProxies)
             try:
                 image = Image.open(BytesIO(response.content))
                 if not os.path.exists(self.current_user_path):
@@ -351,7 +357,7 @@ class downloader:
         if not args['skip_comments']:
             # no api method to get comments so using from html (not future proof)
             post_url = f"https://{self.current_user['site']}.party/{self.current_user['service']}/user/{self.current_user['user_id']}/post/{self.current_post['id']}"
-            response = self.session.get(url=post_url, allow_redirects=True, cookies=args['cookies'], timeout=TIMEOUT)
+            response = self.session.get(url=post_url, allow_redirects=True, cookies=args['cookies'], timeout=TIMEOUT, proxies=myProxies)
             page_soup = BeautifulSoup(response.text, 'html.parser')
             comment_html = page_soup.find("div", {"class": "post__comments"})
             if comment_html:
@@ -386,7 +392,7 @@ class downloader:
         new_server = {'site':site,'service':service,'server_id':server_id,'username':username,'channels':[]}
         headers = {'accept': 'application/json'}
         server_api_url = f"https://{site}.party/api/{service}/channels/lookup?q={server_id}"
-        sever_response = self.session.get(url=server_api_url, headers=headers, timeout=TIMEOUT).json()
+        sever_response = self.session.get(url=server_api_url, headers=headers, timeout=TIMEOUT, proxies=myProxies).json()
         if not sever_response:
             logger.error(f"Server has no api information: URL {server_api_url}")
             return
@@ -395,7 +401,7 @@ class downloader:
             channel_messages = []
             while True:
                 channel_api_url = f"https://{site}.party/api/{service}/channel/{channel['id']}?skip={skip}"
-                channel_response = self.session.get(url=channel_api_url, headers=headers, timeout=TIMEOUT).json()
+                channel_response = self.session.get(url=channel_api_url, headers=headers, timeout=TIMEOUT, proxies=myProxies).json()
                 if not channel_response and skip == 0:
                     logger.error(f"Channel has no api information: URL {channel_api_url}")
                     return
@@ -426,7 +432,7 @@ class downloader:
             logger.info(f"Skipping download: File extention not supported {os.path.split(file_name)[1].split('.')[-1]}")
             return
 
-        logger.info(f"Downloading {os.path.split(file_name)[1]}")
+        logger.info(strftime("%Y-%m-%d %H:%M:%S ", localtime()) + f"Downloading {os.path.split(file_name)[1]}")
 
         # check if file exists and if hashes match
         if os.path.exists(file_name) and file_hash:
@@ -442,7 +448,12 @@ class downloader:
                    'Range': f'bytes={resume_size}-',
                    'User-Agent': args['user_agent']}
 
-        response = self.session.get(url=url, stream=True, headers=headers, cookies=args['cookies'], timeout=TIMEOUT)
+        try:
+            response = self.session.get(url=url, stream=True, headers=headers, cookies=args['cookies'], timeout=TIMEOUT, proxies=myProxies)
+        except requests.exceptions.SSLError as err:
+            logger.warning(strftime("%Y-%m-%d %H:%M:%S ", localtime()) + "Exception occurred: SSLError")
+            response = self.requests.get(url=url, stream=True, headers=headers, cookies=args['cookies'], timeout=TIMEOUT, proxies=myProxies, verify=False)
+            # pass
 
         # do not retry on a 404
         if response.status_code == 404:
@@ -493,14 +504,18 @@ class downloader:
             return
 
         # writing response content to file
-        with open(file_name, 'ab') as f:
-            start = time.time()
-            downloaded = resume_size
-            for chunk in response.iter_content(chunk_size=1024*1024):
-                downloaded += len(chunk)
-                f.write(chunk)
-                print_download_bar(total, downloaded, resume_size, start)
-        print()
+        try:
+            with open(file_name, 'ab') as f:
+                start = time.time()
+                downloaded = resume_size
+                for chunk in response.iter_content(chunk_size=1024*1024):
+                    downloaded += len(chunk)
+                    f.write(chunk)
+                    print_download_bar(total, downloaded, resume_size, start)
+            print()
+        except Exception:
+            logger.warning(strftime("%Y-%m-%d %H:%M:%S ", localtime()) + "Exception occurred.")
+            pass
 
         # My futile attempts to check if the file downloaded correctly
         if os.path.exists(file_name) and file_hash:
@@ -661,7 +676,7 @@ def check_version():
     except:
         current_version = datetime.datetime.strptime(__version__, r'%Y.%m.%d.%H')
     github_api_url = 'https://api.github.com/repos/AplhaSlayer1964/kemono-dl/releases/latest'
-    responce = requests.get(url=github_api_url, timeout=TIMEOUT)
+    responce = requests.get(url=github_api_url, timeout=TIMEOUT, proxies=myProxies)
     if not responce.ok:
         logger.warning(f"Could not check github for latest release.")
         return
