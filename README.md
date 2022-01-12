@@ -1,5 +1,5 @@
 # kemono-dl
-A simple downloader for kemono.party and coomer.party.
+A simple downloader for kemono.party and coomer.party. I will be adding support for discord soon, if you could please let me know how you want those images stored by commenting [here](https://github.com/AplhaSlayer1964/kemono-dl/issues/48).
 
 ## How to use
 1.  Install python. (Disable path length limit during install)
@@ -108,8 +108,13 @@ CWD
 ```
 If you wish to change the folder path for now you will need to edit these two functions in `main.py`
 
--   _set_current_user_path()
--   _set_current_post_path()
+-   _set_current_user()
+-   _set_current_post()
+
+For discord servers you need to edit these functions in `main.py`
+-   _set_current_server()
+-   _set_current_channel()
+-   _set_current_message()
 
 If you edit these functions and the program doesn't work correctly you will have to figure out the problem yourself. Do not file an issue in this case.
 ### Deprecated Options
