@@ -16,6 +16,8 @@ from io import BytesIO
 import platform
 import sys
 
+from functools import cmp_to_key
+
 from .arguments import get_args
 from .logger import logger
 from .version import __version__
@@ -96,6 +98,15 @@ class downloader:
                     return creator['name']
         return None
 
+    def reversed_cmp(self, x, y):
+        x_time=datetime.datetime.strptime(x['updated'], r'%a, %d %b %Y %H:%M:%S %Z').timestamp()
+        y_time=datetime.datetime.strptime(y['updated'], r'%a, %d %b %Y %H:%M:%S %Z').timestamp()
+        if x_time > y_time:
+            return -1
+        if x_time < y_time:
+            return 1
+        return 0
+
     def add_favorite_artists(self, site:str):
         self._add_all_creators(site)
         logger.info('Gathering favorite users')
@@ -105,7 +116,11 @@ class downloader:
         if not response.ok:
             logger.warning(f'{response.status_code} {response.reason}: Could not get favorite artists: Make sure you get your cookie file while logged in')
             return
-        for favorite in response.json():
+
+        favorite_list=response.json()
+        favorite_list=sorted(favorite_list,key=cmp_to_key(self.reversed_cmp))
+
+        for favorite in favorite_list:
             current_updated = datetime.datetime.strptime(favorite['updated'], r'%a, %d %b %Y %H:%M:%S %Z')
             if current_updated > args['favorite_users_updated_within']:
                 self._find_posts(site,favorite['service'],favorite['id'])
@@ -329,11 +344,25 @@ class downloader:
                 content_soup = self._save_inline(content_soup)
             if args['extract_links']:
                 if not os.path.exists(self.current_post_path):
-                    os.makedirs(self.current_post_path)
+                    try:
+                        os.makedirs(self.current_post_path)
+                    except Exception:
+                        logger.error(f"extract_links post路径名出错: current_post_path {self.current_post_path}")
+                        self.current_post_path = self.current_post_path[0:len(self.current_user_path) + 22].strip()
+                        if not os.path.exists(self.current_post_path):
+                            os.makedirs(self.current_post_path)
+                        # pass
                 self._save_links(content_soup)
             if not args['skip_content']:
                 if not os.path.exists(self.current_post_path):
-                    os.makedirs(self.current_post_path)
+                    try:
+                        os.makedirs(self.current_post_path)
+                    except Exception:
+                        logger.error(f"skip_content post路径名出错: current_post_path {self.current_post_path}")
+                        self.current_post_path = self.current_post_path[0:len(self.current_user_path) + 22].strip()
+                        if not os.path.exists(self.current_post_path):
+                            os.makedirs(self.current_post_path)
+                        # pass
                 with open(os.path.join(self.current_post_path, 'content.html'),'wb') as f:
                     f.write(content_soup.prettify().encode("utf-16"))
 
