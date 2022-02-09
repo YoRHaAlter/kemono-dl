@@ -98,12 +98,19 @@ class downloader:
                     return creator['name']
         return None
 
-    def reversed_cmp(self, x, y):
+    def update_time_cmp(self, x, y):
         x_time=datetime.datetime.strptime(x['updated'], r'%a, %d %b %Y %H:%M:%S %Z').timestamp()
         y_time=datetime.datetime.strptime(y['updated'], r'%a, %d %b %Y %H:%M:%S %Z').timestamp()
         if x_time > y_time:
             return -1
         if x_time < y_time:
+            return 1
+        return 0
+
+    def add_fav_time_cmp(self, x, y):
+        if x['faved_seq'] > y['faved_seq']:
+            return -1
+        if x['faved_seq'] < y['faved_seq']:
             return 1
         return 0
 
@@ -118,7 +125,7 @@ class downloader:
             return
 
         favorite_list=response.json()
-        favorite_list=sorted(favorite_list,key=cmp_to_key(self.reversed_cmp))
+        favorite_list=sorted(favorite_list, key=cmp_to_key(self.update_time_cmp))
 
         for favorite in favorite_list:
             current_updated = datetime.datetime.strptime(favorite['updated'], r'%a, %d %b %Y %H:%M:%S %Z')
@@ -205,10 +212,27 @@ class downloader:
         logger.debug("user_id: {user} service: {service} post_id: {id} url: https://{site}.party/{service}/user/{user}/post/{id}".format(site=self.current_user['site'],**self.current_post))
         logger.debug(f"Sleeping for {args['post_timeout']} seconds")
         time.sleep(args['post_timeout'])
-        self._download_content()
-        self._download_attachments()
-        self._download_comments()
-        self._download_embeds()
+        try:
+            self._download_content()
+        except:
+            logger.exception(f"content下载出现异常 Post: {clean_folder_name(self.current_post['title'])}")
+            # pass
+
+        try:
+            self._download_attachments()
+        except:
+            logger.exception(f"attachments下载出现异常 Post: {clean_folder_name(self.current_post['title'])}")
+
+        try:
+            self._download_comments()
+        except:
+            logger.exception(f"comments下载出现异常 Post: {clean_folder_name(self.current_post['title'])}")
+
+        try:
+            self._download_embeds()
+        except:
+            logger.exception(f"embeds下载出现异常 Post: {clean_folder_name(self.current_post['title'])}")
+
         self._save_json()
         self._write_archive()
         self.current_post_errors = 0
@@ -765,7 +789,7 @@ def check_version():
         except:
             current_version = datetime.datetime.strptime(__version__, r'%Y.%m.%d.%H')
         github_api_url = 'https://api.github.com/repos/AplhaSlayer1964/kemono-dl/releases/latest'
-    responce = requests.get(url=github_api_url, timeout=TIMEOUT, proxies=myProxies)
+        responce = requests.get(url=github_api_url, timeout=TIMEOUT, proxies=myProxies)
         if not responce.ok:
             logger.warning(f"Could not check github for latest release.")
             return
