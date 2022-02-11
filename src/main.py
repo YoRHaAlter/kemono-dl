@@ -354,10 +354,17 @@ class downloader:
                     os.makedirs(self.current_post_path)
             for index, attachment in enumerate(self.current_post['attachments']):
                 index_string = str(index+1).zfill(len(str(len(self.current_post['attachments']))))
-                file_name = os.path.join(self.current_post_path, clean_file_name(f"[{index_string}]_{attachment['name']}"))
-                if args['no_indexing']:
-                    file_name = os.path.join(self.current_post_path, clean_file_name(f"{attachment['name']}"))
                 file_url = f"https://{self.current_user['site']}.party/data{attachment['path']}?f={attachment['name']}"
+                broken_file_name = re.search(r'https://www\.patreon\.com/media-u/([^/]+)',attachment['name'])
+                if broken_file_name:
+                    logger.warning(f"Report this file to kemono.party for having a URL as a file name! file URL: {file_url}")
+                    file_name = os.path.join(self.current_post_path, clean_file_name(f"[{index_string}]_{attachment['name']}.{attachment['path'].rsplit('.', 1)[-1]}"))
+                    if args['no_indexing']:
+                        file_name = os.path.join(self.current_post_path, clean_file_name(f"{attachment['name']}.{attachment['path'].rsplit('.', 1)[-1]}"))
+                else:
+                    file_name = os.path.join(self.current_post_path, clean_file_name(f"[{index_string}]_{attachment['name']}"))
+                    if args['no_indexing']:
+                        file_name = os.path.join(self.current_post_path, clean_file_name(f"{attachment['name']}"))
                 file_hash = find_hash(attachment['path'])
                 self._requests_download(file_url, file_name, file_hash)
 
@@ -736,10 +743,20 @@ def print_download_bar(total:int, downloaded:int, resumed:int, start):
         print(f'[{bar_fill}{bar_empty}] {downloaded}/{total[0]} {total[1]} at {rate[0]} {rate[1]}/s ETA {eta}{overlap_buffer}', end='\r')
 
 def clean_file_name(string:str):
+    file_split = string.rsplit('.', 1)
+    if len(file_split) == 1:
+        file_name = file_split[0]
+        file_extention = ''
+    else:
+        file_name = file_split[0]
+        file_extention = f".{file_split[1]}"
     if args['restrict_names']:
-        string = restrict_names(string)
+        file_name = restrict_names(file_name)
+        file_extention = restrict_names(file_extention)
     # if OS_NAME == 'Windows':
-    return re.sub(r'[\\/:\"*?<>|\n\t\b]','_',string)[:255]
+    file_extention = re.sub(r'[\\/:\"*?<>|\n\t\b]','_',file_extention)
+    file_name = re.sub(r'[\\/:\"*?<>|\n\t\b]','_',file_name)[:255-len(file_extention)]
+    return f"{file_name}{file_extention}"
 
 def clean_folder_name(string:str):
     if args['restrict_names']:
