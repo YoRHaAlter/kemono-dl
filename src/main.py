@@ -208,7 +208,7 @@ class downloader:
             chunk += 25
 
     def download_post(self):
-        logger.info(f"Downloading Post: {clean_folder_name(self.current_post['title'])}")
+        logger.info(f"Downloading User: {self.current_user['username']} Post: {clean_folder_name(self.current_post['title'])}")
         logger.debug("user_id: {user} service: {service} post_id: {id} url: https://{site}.party/{service}/user/{user}/post/{id}".format(site=self.current_user['site'],**self.current_post))
         logger.debug(f"Sleeping for {args['post_timeout']} seconds")
         time.sleep(args['post_timeout'])
