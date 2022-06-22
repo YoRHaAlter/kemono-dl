@@ -125,7 +125,8 @@ class downloader:
             return
 
         favorite_list=response.json()
-        favorite_list=sorted(favorite_list, key=cmp_to_key(self.update_time_cmp))
+        # favorite_list = sorted(favorite_list, key=cmp_to_key(self.update_time_cmp))
+        favorite_list=sorted(favorite_list, key=cmp_to_key(self.add_fav_time_cmp))
 
         for favorite in favorite_list:
             current_updated = datetime.datetime.strptime(favorite['updated'], r'%a, %d %b %Y %H:%M:%S %Z')
