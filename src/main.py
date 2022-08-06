@@ -16,6 +16,7 @@ from .logger import logger
 from .version import __version__
 from .helper import get_file_hash, print_download_bar, check_date, parse_url, compile_post_path, compile_file_path, RefererSession
 from .my_yt_dlp import my_yt_dlp
+from time import strftime, localtime
 
 from time import strftime, localtime
 from functools import cmp_to_key
@@ -141,7 +142,8 @@ class downloader:
                 self.get_post(f"https://{domain}/{favorite['service']}/user/{favorite['user']}/post/{favorite['id']}")
             if fav_type == 'artist':
                 if not (favorite['service'] in services or 'all' in services):
-                    logger.info(f"Skipping user {favorite['name']} | Service {favorite['service']} was not requested")
+                    logger.info(strftime("%Y-%m-%d %H:%M:%S ",
+                                         localtime()) + f"Skipping user {favorite['name']} | Service {favorite['service']} was not requested")
                     continue
                 self.get_post(f"https://{domain}/{favorite['service']}/user/{favorite['id']}")
 
@@ -178,7 +180,8 @@ class downloader:
         if not is_post:
             if self.skip_user(user):
                 return
-        logger.info(f"Downloading posts from {site}.party | {service} | {user['name']} | {user['id']}")
+        logger.info(strftime("%Y-%m-%d %H:%M:%S ",
+                             localtime()) + f"Downloading posts from {site}.party | {service} | {user['name']} | {user['id']}")
         chunk = 0
         first = True
         while True:
@@ -245,10 +248,11 @@ class downloader:
                 file_path = compile_file_path(post['post_path'], post['post_variables'], file_variables,
                                               self.user_filename_template, self.restrict_ascii)
                 if os.path.exists(file_path):
-                    logger.info(f"Skipping: {os.path.split(file_path)[1]} | File already exists")
+                    logger.info(strftime("%Y-%m-%d %H:%M:%S ",
+                                         localtime()) + f"Skipping: {os.path.split(file_path)[1]} | File already exists")
                     return
-                logger.info(f"Downloading: {os.path.split(file_path)[1]}")
-                logger.debug(f"Downloading to: {file_path}")
+                logger.info(strftime("%Y-%m-%d %H:%M:%S ", localtime()) + f"Downloading: {os.path.split(file_path)[1]}")
+                logger.debug(strftime("%Y-%m-%d %H:%M:%S ", localtime()) + f"Downloading to: {file_path}")
                 if not self.simulate:
                     if not os.path.exists(os.path.split(file_path)[0]):
                         os.makedirs(os.path.split(file_path)[0])
@@ -402,7 +406,8 @@ class downloader:
 
     def download_post(self, post: dict):
         # might look buggy if title has new lines in it
-        logger.info("Downloading Post | {title}".format(**post['post_variables']))
+        logger.info(
+            strftime("%Y-%m-%d %H:%M:%S ", localtime()) + "Downloading Post | {title}".format(**post['post_variables']))
         logger.debug("Post URL: https://{site}/{service}/user/{user_id}/post/{id}".format(**post['post_variables']))
         self.download_attachments(post)
         self.download_inline(post)
@@ -467,7 +472,8 @@ class downloader:
     def write_to_file(self, file_path, file_content):
         # check if file exists and if should overwrite
         if os.path.exists(file_path) and not self.overwrite:
-            logger.info(f"Skipping: {os.path.split(file_path)[1]} | File already exists")
+            logger.info(strftime("%Y-%m-%d %H:%M:%S ",
+                                 localtime()) + f"Skipping: {os.path.split(file_path)[1]} | File already exists")
             return
         logger.info(f"Writing: {os.path.split(file_path)[1]}")
         logger.debug(f"Writing to: {file_path}")
@@ -490,9 +496,9 @@ class downloader:
 
         part_file = f"{file['file_path']}.part" if not self.no_part else file['file_path']
 
-        logger.info(f"Downloading: {os.path.split(file['file_path'])[1]}")
-        logger.debug(f"Downloading from: {file['file_variables']['url']}")
-        logger.debug(f"Downloading to: {part_file}")
+        logger.info(strftime("%Y-%m-%d %H:%M:%S ", localtime()) + f"Downloading: {os.path.split(file['file_path'])[1]}")
+        logger.debug(strftime("%Y-%m-%d %H:%M:%S ", localtime()) + f"Downloading from: {file['file_variables']['url']}")
+        logger.debug(strftime("%Y-%m-%d %H:%M:%S ", localtime()) + f"Downloading to: {part_file}")
 
         # try to resume part file
         resume_size = 0
@@ -628,7 +634,8 @@ class downloader:
         # check last update date
         if self.user_up_datebefore or self.user_up_dateafter:
             if check_date(self.get_date_by_type(user['updated']), None, self.user_up_datebefore, self.user_up_dateafter):
-                logger.info("Skipping user | user updated date not in range")
+                logger.info(
+                    strftime("%Y-%m-%d %H:%M:%S ", localtime()) + "Skipping user | user updated date not in range")
                 return True
         return False
 
@@ -637,15 +644,17 @@ class downloader:
         if self.archive_file:
             if "https://{site}/{service}/user/{user_id}/post/{id}".format(
                     **post['post_variables']) in self.archive_list:
-                logger.info("Skipping post | post already archived")
+                logger.info(strftime("%Y-%m-%d %H:%M:%S ", localtime()) + "Skipping post | post already archived")
                 return True
 
         if self.date or self.datebefore or self.dateafter:
             if not post['post_variables']['published']:
-                logger.info("Skipping post | post published date not in range")
+                logger.info(
+                    strftime("%Y-%m-%d %H:%M:%S ", localtime()) + "Skipping post | post published date not in range")
                 return True
             elif check_date(self.get_date_by_type(post['post_variables']['published'], self.date_strf_pattern), self.date, self.datebefore, self.dateafter):
-                logger.info("Skipping post | post published date not in range")
+                logger.info(
+                    strftime("%Y-%m-%d %H:%M:%S ", localtime()) + "Skipping post | post published date not in range")
                 return True
 
         if self.archive_file:
@@ -655,7 +664,8 @@ class downloader:
                 return True
 
         if "https://{site}/{service}/user/{user_id}/post/{id}".format(**post['post_variables']) in self.comp_posts:
-            logger.info("Skipping post | post was already downloaded this session")
+            logger.info(strftime("%Y-%m-%d %H:%M:%S ",
+                                 localtime()) + "Skipping post | post was already downloaded this session")
             return True
 
         return False
@@ -673,19 +683,22 @@ class downloader:
                         os.remove(file['file_path'])
                         return False
                     confirm_msg = ' hash confirmed'
-                logger.info(f"Skipping: {os.path.split(file['file_path'])[1]} | File already exists{confirm_msg}")
+                logger.info(strftime("%Y-%m-%d %H:%M:%S ",
+                                     localtime()) + f"Skipping: {os.path.split(file['file_path'])[1]} | File already exists{confirm_msg}")
                 return True
 
         # check file name extention
         if self.only_ext:
             if not file['file_variables']['ext'].lower() in self.only_ext:
                 logger.info(
-                    f"Skipping: {os.path.split(file['file_path'])[1]} | File extention {file['file_variables']['ext']} not found in include list {self.only_ext}")
+                    strftime("%Y-%m-%d %H:%M:%S ",
+                             localtime()) + f"Skipping: {os.path.split(file['file_path'])[1]} | File extention {file['file_variables']['ext']} not found in include list {self.only_ext}")
                 return True
         if self.not_ext:
             if file['file_variables']['ext'].lower() in self.not_ext:
                 logger.info(
-                    f"Skipping: {os.path.split(file['file_path'])[1]} | File extention {file['file_variables']['ext']} found in exclude list {self.not_ext}")
+                    strftime("%Y-%m-%d %H:%M:%S ",
+                             localtime()) + f"Skipping: {os.path.split(file['file_path'])[1]} | File extention {file['file_variables']['ext']} found in exclude list {self.not_ext}")
                 return True
 
         # check file size
@@ -693,17 +706,20 @@ class downloader:
             file_size = requests.get(file['file_variables']['url'], cookies=self.cookies, stream=True).headers.get(
                 'content-length', 0)
             if int(file_size) == 0:
-                logger.info(f"Skipping: {os.path.split(file['file_path'])[1]} | File size not included in file header")
+                logger.info(strftime("%Y-%m-%d %H:%M:%S ",
+                                     localtime()) + f"Skipping: {os.path.split(file['file_path'])[1]} | File size not included in file header")
                 return True
             if self.min_size and self.max_size:
                 if not (self.min_size <= int(file_size) <= self.max_size):
                     logger.info(
-                        f"Skipping: {os.path.split(file['file_path'])[1]} | File size in bytes {file_size} was not between {self.min_size} and {self.max_size}")
+                        strftime("%Y-%m-%d %H:%M:%S ",
+                                 localtime()) + f"Skipping: {os.path.split(file['file_path'])[1]} | File size in bytes {file_size} was not between {self.min_size} and {self.max_size}")
                     return True
             elif self.min_size:
                 if not (self.min_size <= int(file_size)):
                     logger.info(
-                        f"Skipping: {os.path.split(file['file_path'])[1]} | File size in bytes {file_size} was not >= {self.min_size}")
+                        strftime("%Y-%m-%d %H:%M:%S ",
+                                 localtime()) + f"Skipping: {os.path.split(file['file_path'])[1]} | File size in bytes {file_size} was not >= {self.min_size}")
                     return True
             elif self.max_size:
                 if not (int(file_size) <= self.max_size):
