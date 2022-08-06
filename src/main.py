@@ -17,6 +17,9 @@ from .version import __version__
 from .helper import get_file_hash, print_download_bar, check_date, parse_url, compile_post_path, compile_file_path, RefererSession
 from .my_yt_dlp import my_yt_dlp
 
+from time import strftime, localtime
+from functools import cmp_to_key
+
 
 class downloader:
 
@@ -128,7 +131,12 @@ class downloader:
         if not response.ok:
             logger.error(f"{response.status_code} {response.reason}")
             return
-        for favorite in response.json():
+
+        favorite_list = response.json()
+        if fav_type == 'artist':
+            favorite_list = sorted(favorite_list, key=cmp_to_key(self.update_time_cmp))
+
+        for favorite in favorite_list:
             if fav_type == 'post':
                 self.get_post(f"https://{domain}/{favorite['service']}/user/{favorite['user']}/post/{favorite['id']}")
             if fav_type == 'artist':
@@ -136,6 +144,22 @@ class downloader:
                     logger.info(f"Skipping user {favorite['name']} | Service {favorite['service']} was not requested")
                     continue
                 self.get_post(f"https://{domain}/{favorite['service']}/user/{favorite['id']}")
+
+    def update_time_cmp(self, x, y):
+        x_time = datetime.datetime.strptime(x['updated'], r'%a, %d %b %Y %H:%M:%S %Z').timestamp()
+        y_time = datetime.datetime.strptime(y['updated'], r'%a, %d %b %Y %H:%M:%S %Z').timestamp()
+        if x_time > y_time:
+            return -1
+        if x_time < y_time:
+            return 1
+        return 0
+
+    def add_fav_time_cmp(self, x, y):
+        if x['faved_seq'] > y['faved_seq']:
+            return -1
+        if x['faved_seq'] < y['faved_seq']:
+            return 1
+        return 0
 
     def get_post(self, url: str):
         found = re.search(r'(https://(kemono\.party|coomer\.party)/)(([^/]+)/user/([^/]+)($|/post/[^/]+))', url)
@@ -622,6 +646,12 @@ class downloader:
                 return True
             elif check_date(self.get_date_by_type(post['post_variables']['published'], self.date_strf_pattern), self.date, self.datebefore, self.dateafter):
                 logger.info("Skipping post | post published date not in range")
+                return True
+
+        if self.archive_file:
+            if "https://{site}/{service}/user/{user_id}/post/{id}".format(
+                    **post['post_variables']) in self.archive_list:
+                logger.info(strftime("%Y-%m-%d %H:%M:%S ", localtime()) + "Skipping post | post already archived")
                 return True
 
         if "https://{site}/{service}/user/{user_id}/post/{id}".format(**post['post_variables']) in self.comp_posts:
