@@ -1,26 +1,23 @@
-import requests
-from requests.adapters import HTTPAdapter, Retry
-import re
-import os
-import math
-from bs4 import BeautifulSoup
-import time
 import datetime
-from PIL import Image
-from io import BytesIO
 import json
+import math
+import os
+import re
+import time
+from functools import cmp_to_key
+from io import BytesIO
 from numbers import Number
+from time import strftime, localtime
+
+import requests
+from PIL import Image
+from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter, Retry
 
 from .args import get_args
-from .logger import logger
-from .version import __version__
 from .helper import get_file_hash, print_download_bar, check_date, parse_url, compile_post_path, compile_file_path, \
     RefererSession
-from .my_yt_dlp import my_yt_dlp
-from time import strftime, localtime
-
-from time import strftime, localtime
-from functools import cmp_to_key
+from .logger import logger
 
 
 class downloader:
@@ -212,8 +209,11 @@ class downloader:
                         logger.info(f"Sleeping for {self.post_timeout} seconds.")
                         time.sleep(self.post_timeout)
                 except:
-                    logger.exception("Unable to download post | service:{service} user_id:{user_id} post_id:{id}".format(**post['post_variables']))
-                self.comp_posts.append("https://{site}/{service}/user/{user_id}/post/{id}".format(**post['post_variables']))
+                    logger.exception(
+                        "Unable to download post | service:{service} user_id:{user_id} post_id:{id}".format(
+                            **post['post_variables']))
+                self.comp_posts.append(
+                    "https://{site}/{service}/user/{user_id}/post/{id}".format(**post['post_variables']))
             min_chunk_size = 25
             # adapt chunk_size. I assume min chunck size is 25, and it should be a multiple of 25
             # for now kemono.party chunk size is 50
@@ -221,7 +221,7 @@ class downloader:
             chunk_size = math.ceil((len(json) / min_chunk_size)) * min_chunk_size
             logger.debug(f"Adaptive chunk_size set to {chunk_size}")
             if len(json) < chunk_size:
-                return # completed
+                return  # completed
             chunk += chunk_size
 
     def download_icon_banner(self, post: dict, img_types: list):
@@ -284,9 +284,12 @@ class downloader:
                 'hash': file_hash,
                 'index': f"{index + 1}".zfill(len(str(len(inline_images))))
             }
-            file['file_path'] = compile_file_path(post['post_path'], post['post_variables'], file['file_variables'], self.inline_filename_template, self.restrict_ascii)
+            file['file_path'] = compile_file_path(post['post_path'], post['post_variables'], file['file_variables'],
+                                                  self.inline_filename_template, self.restrict_ascii)
             # get dir which stores html to calculate relative path
-            html_dir = os.path.split(compile_file_path(post['post_path'], post['post_variables'], file['file_variables'], self.other_filename_template, self.restrict_ascii))[0]
+            html_dir = os.path.split(
+                compile_file_path(post['post_path'], post['post_variables'], file['file_variables'],
+                                  self.other_filename_template, self.restrict_ascii))[0]
             # set local image location in html
             inline_image['src'] = os.path.relpath(file['file_path'], html_dir)
             post['inline_images'].append(file)
@@ -635,7 +638,8 @@ class downloader:
                 logger.info(
                     strftime("%Y-%m-%d %H:%M:%S ", localtime()) + "Skipping post | post published date not in range")
                 return True
-            elif check_date(self.get_date_by_type(post['post_variables']['published'], self.date_strf_pattern), self.date, self.datebefore, self.dateafter):
+            elif check_date(self.get_date_by_type(post['post_variables']['published'], self.date_strf_pattern),
+                            self.date, self.datebefore, self.dateafter):
                 logger.info(
                     strftime("%Y-%m-%d %H:%M:%S ", localtime()) + "Skipping post | post published date not in range")
                 return True
@@ -766,7 +770,7 @@ class downloader:
             except:
                 logger.exception(f"Unable to get posts for {url}")
 
-    def get_date_by_type(self, time, date_format =  r'%a, %d %b %Y %H:%M:%S %Z'):
+    def get_date_by_type(self, time, date_format=r'%a, %d %b %Y %H:%M:%S %Z'):
         if isinstance(time, Number):
             t = datetime.datetime.fromtimestamp(time)
         elif isinstance(time, str):
