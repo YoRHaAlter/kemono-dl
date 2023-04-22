@@ -135,11 +135,14 @@ class downloader:
             if fav_type == 'post':
                 self.get_post(f"https://{domain}/{favorite['service']}/user/{favorite['user']}/post/{favorite['id']}")
             if fav_type == 'artist':
-                if not (favorite['service'] in services or 'all' in services):
-                    logger.info(strftime("%Y-%m-%d %H:%M:%S ",
-                                         localtime()) + f"Skipping user {favorite['name']} | Service {favorite['service']} was not requested")
-                    continue
-                self.get_post(f"https://{domain}/{favorite['service']}/user/{favorite['id']}")
+                try:
+                    if not (favorite['service'] in services or 'all' in services):
+                        logger.info(strftime("%Y-%m-%d %H:%M:%S ", localtime()) +
+                                    f"Skipping user {favorite['name']} | Service {favorite['service']} was not requested")
+                        continue
+                    self.get_post(f"https://{domain}/{favorite['service']}/user/{favorite['id']}")
+                except:
+                    logger.exception(f"Unable to get favorite users {favorite['id']}")
 
     def update_time_cmp(self, x, y):
         x_time = datetime.datetime.strptime(x['updated'], r'%a, %d %b %Y %H:%M:%S %Z').timestamp()
