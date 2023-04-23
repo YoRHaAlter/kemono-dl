@@ -3,6 +3,7 @@ import json
 import math
 import os
 import re
+import threading
 import time
 from functools import cmp_to_key
 from io import BytesIO
@@ -20,7 +21,7 @@ from .helper import get_file_hash, print_download_bar, check_date, parse_url, co
 from .logger import logger
 
 
-class downloader:
+class downloader():
 
     def __init__(self, args):
 
@@ -137,11 +138,22 @@ class downloader:
                         logger.info(strftime("%Y-%m-%d %H:%M:%S ", localtime()) +
                                     f"Skipping user {favorite['name']} | Service {favorite['service']} was not requested")
                         continue
-                    self.get_post(f"https://{domain}/{favorite['service']}/user/{favorite['id']}")
+                    # self.get_post(f"https://{domain}/{favorite['service']}/user/{favorite['id']}")
+                    post_downloader_threads = []
+                    thread_numbers = 5  # 线程数
+                    for i in range(1, thread_numbers):
+                        thread = PostDownloader(self,
+                                                f"post_downloader_{i}",
+                                                f"https://{domain}/{favorite['service']}/user/{favorite['id']}")
+                        thread.start()
+                        post_downloader_threads.append(thread)
+                    for thread in post_downloader_threads:
+                        thread.join()
                 except:
                     logger.exception(f"Unable to get favorite users {favorite['id']}")
 
-    def update_time_cmp(self, x, y):
+    @staticmethod
+    def update_time_cmp(x, y):
         x_time = datetime.datetime.strptime(x['updated'], r'%a, %d %b %Y %H:%M:%S %Z').timestamp()
         y_time = datetime.datetime.strptime(y['updated'], r'%a, %d %b %Y %H:%M:%S %Z').timestamp()
         if x_time > y_time:
@@ -150,7 +162,8 @@ class downloader:
             return 1
         return 0
 
-    def add_fav_time_cmp(self, x, y):
+    @staticmethod
+    def add_fav_time_cmp(x, y):
         if x['faved_seq'] > y['faved_seq']:
             return -1
         if x['faved_seq'] < y['faved_seq']:
@@ -784,6 +797,85 @@ class downloader:
     def format_time_by_type(self, time):
         t = self.get_date_by_type(time)
         return t.strftime(self.date_strf_pattern) if t != None else t
+
+
+class PostDownloader(threading.Thread):
+    def __int__(self, dl: downloader, thread_id: str, url: str):
+        threading.Thread.__init__(self)
+        self.dl = dl
+        self.thread_id = thread_id
+        self.url = url
+
+    def run(self):
+        self.get_post(self.url)
+
+    def get_post(self, url: str):
+        found = re.search(r'(https://(kemono\.party|coomer\.party)/)(([^/]+)/user/([^/]+)($|/post/[^/]+))', url)
+        if not found:
+            logger.error(f"Unable to find url parameters for {url}")
+            return
+        api = f"{found.group(1)}api/{found.group(3)}"
+        site = found.group(2)
+        service = found.group(4)
+        user_id = found.group(5)
+        is_post = found.group(6)
+        user = downloader.get_user(self.dl, user_id, service)
+        if not user:
+            logger.error(f"Unable to find user info in creators list | {service} | {user_id}")
+            return
+        if not is_post:
+            if downloader.skip_user(self.dl, user):
+                return
+        logger.info(strftime("%Y-%m-%d %H:%M:%S ",
+                             localtime()) + f"Downloading posts from {site}.party | {service} | {user['name']} | {user['id']}")
+        chunk = 0
+        first = True
+        while True:
+            if is_post:
+                logger.debug(f"Requesting post json from: {api}")
+                json = self.dl.session.get(url=api, cookies=self.dl.cookies, headers=self.dl.headers,
+                                           timeout=self.dl.timeout,
+                                           proxies=self.dl.MY_PROXIES).json()
+            else:
+                logger.debug(f"Requesting user json from: {api}?o={chunk}")
+                json = self.dl.session.get(url=f"{api}?o={chunk}", cookies=self.dl.cookies, headers=self.dl.headers,
+                                           timeout=self.dl.timeout, proxies=self.dl.MY_PROXIES).json()
+            if not json:
+                if is_post:
+                    logger.error(f"Unable to find post json for {api}")
+                elif chunk == 0:
+                    logger.error(f"Unable to find user json for {api}?o={chunk}")
+                return  # completed
+            for post in json:
+                post = self.dl.clean_post(post, user, site)
+                # only download once
+                if not is_post and first:
+                    self.dl.download_icon_banner(post, self.dl.icon_banner)
+                    if self.dl.dms:
+                        self.dl.write_dms(post)
+                    first = False
+                if self.dl.skip_post(post):
+                    continue
+                try:
+                    self.dl.download_post(post)
+                    if self.dl.post_timeout:
+                        logger.info(f"Sleeping for {self.dl.post_timeout} seconds.")
+                        time.sleep(self.dl.post_timeout)
+                except:
+                    logger.exception(
+                        "Unable to download post | service:{service} user_id:{user_id} post_id:{id}".format(
+                            **post['post_variables']))
+                self.dl.comp_posts.append(
+                    "https://{site}/{service}/user/{user_id}/post/{id}".format(**post['post_variables']))
+            min_chunk_size = 25
+            # adapt chunk_size. I assume min chunck size is 25, and it should be a multiple of 25
+            # for now kemono.party chunk size is 50
+            # however coomer.party chunk size is 25
+            chunk_size = math.ceil((len(json) / min_chunk_size)) * min_chunk_size
+            logger.debug(f"Adaptive chunk_size set to {chunk_size}")
+            if len(json) < chunk_size:
+                return  # completed
+            chunk += chunk_size
 
 
 def main():
